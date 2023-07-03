@@ -7,7 +7,7 @@
 4. Auto-Testing tools: SonarQube
 5. CodeQL: CodeQL is the code analysis engine developed by GitHub to automate security checks.
 
-pipeline flow:
+pipelighklhk,j,jkjne flow:
 
 1. when code is pushed to main branch, codeQL is triggered to scan code for security checks.
 2. after a successful scan from codeQL, Sonarqube is triggered to scan code for vulnerabilitues, code smell, duplicated codes,outdated packages and security checks.
