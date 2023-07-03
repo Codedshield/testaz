@@ -1,0 +1,93 @@
+# This is a basic workflow tfor the react to aws s3
+
+name: deploy-react-to-aws-s3
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the master branch
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: '43 3 * * 5'
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  ci:
+    name: "Integration"
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Checkout Code"
+        uses: "actions/checkout@v2"
+
+      - name: "Lint code"
+        run: |
+          echo "Linting repository"
+      - name: "Run unit tests"
+        run: |
+          echo "Running unit tests"
+
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 
+  analyze: #codeQL is triggered to scan pipeline for security checks and leakages.
+    name: Analyze
+    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
+    timeout-minutes: ${{ (matrix.language == 'swift' && 120) || 360 }}
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript' ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Initializes the CodeQL tools for scanning.
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v2
+
+      # - run: |
+      #     echo "Run, Build Application using script"
+      #     ./location_of_script_within_repo/buildscript.sh
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+        with:
+          category: "/language:${{matrix.language}}"
+
+      - name: SonarCloud Scan #sonarqube is added to scan code properly before build
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Build React App
+        run: npm install && npm run build #binstall npm dependecies and build
+      - name: Deploy app build to S3 bucket #push app to s3
+        run: aws s3 sync ./build/ s3://react-test-app-new --delete
+        
+        
